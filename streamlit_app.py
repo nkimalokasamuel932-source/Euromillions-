@@ -3,55 +3,47 @@ import pandas as pd
 import random
 
 # Configuration de la page
-st.set_page_config(page_title="Loto Master Pro", page_icon="🎯")
+st.set_page_config(page_title="Loto & Euro Fusion", page_icon="🔮")
 
-st.title("🎯 Loto Master : Euromillions")
-st.write("Analyse hybride des probabilités pour le prochain tirage.")
+st.title("🔮 Fusion Statistique : Loto & Euromillions")
+st.write("Analyse croisée des tendances du Samedi 25 Avril 2026")
 
 # Chargement des données
 @st.cache_data
 def load_data():
-    # Lit le fichier CSV que tu modifies sur GitHub
-    df = pd.read_csv('synthese_hybride_euromillions.csv')
-    # Trie par score le plus élevé
-    df = df.sort_values(by='Score_Hybride', ascending=False)
-    return df
+    return pd.read_csv('synthese_hybride_euromillions.csv')
 
 try:
-    data = load_data()
+    df = load_data()
 
-    # Affichage du Top 5 des numéros
-    st.subheader("🔥 Top 5 des numéros suggérés")
-    top_5 = data.head(5)
-    
-    # Création de colonnes pour un affichage propre sur mobile
-    cols = st.columns(5)
-    for i, (index, row) in enumerate(top_5.iterrows()):
-        cols[i].metric(label=f"N°", value=int(row['Numero']))
-        st.write(f"Score: **{row['Score_Hybride']}**")
+    # Affichage du tableau de bord
+    st.subheader("📊 Top 10 des numéros en convergence")
+    st.dataframe(df.head(10), use_container_width=True)
 
+    # Générateur de ticket optimisé
     st.divider()
-
-    # Section Générateur de Ticket
-    st.subheader("🎰 Générateur de Ticket Flash")
-    if st.button("Générer mon ticket pour Mardi"):
-        # On prend 5 numéros parmi les 10 meilleurs scores
-        pool_numeros = data['Numero'].head(10).tolist()
-        ticket_nums = random.sample(pool_numeros, 5)
-        ticket_nums.sort()
+    st.subheader("🎯 Générateur de Ticket Stratégique")
+    
+    if st.button("Générer ma combinaison pour Mardi"):
+        # STRATÉGIE : 3 numéros dans le Top 10 + 2 numéros dans le reste
+        top_piliers = df['Numero'].head(10).tolist()
+        autres_nums = [n for n in range(1, 51) if n not in top_piliers]
         
-        # On génère 2 étoiles au hasard (Euromillions : 1 à 12)
-        etoiles = random.sample(range(1, 13), 2)
-        etoiles.sort()
+        selection_piliers = random.sample(top_piliers, 3)
+        selection_surprise = random.sample(autres_nums, 2)
         
-        st.success(f"Numéros : {ticket_nums}")
-        st.warning(f"Étoiles : {etoiles}")
+        ticket_final = sorted(selection_piliers + selection_surprise)
+        etoiles = sorted(random.sample(range(1, 13), 2))
+        
+        # Affichage du résultat
+        st.success(f"**Numéros :** {', '.join(map(str, ticket_final))}")
+        st.warning(f"**Étoiles :** {etoiles[0]} — {etoiles[1]}")
+        
+        st.info("💡 Cette combinaison mixe tes meilleures stats Loto/Euro et une part de hasard contrôlé.")
         st.balloons()
 
-    # Affichage du tableau complet pour les curieux
-    with st.expander("Voir l'analyse complète"):
-        st.dataframe(data)
-
 except Exception as e:
-    st.error(f"Erreur lors de la lecture du fichier CSV : {e}")
-    st.info("Vérifie que ton fichier 'synthese_hybride_euromillions.csv' est bien présent sur GitHub.")
+    st.error(f"Erreur de chargement : {e}")
+    st.info("Vérifie que ton fichier CSV est bien sur GitHub.")
+
+st.sidebar.write("Dernière mise à jour : 26 Avril 2026")
