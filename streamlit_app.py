@@ -3,7 +3,7 @@ import pandas as pd
 import random
 
 # Configuration de la page
-st.set_page_config(page_title="Loto et Euromillions Master Pro", page_icon="🎯")
+st.set_page_config(page_title="Loto Master Pro", page_icon="🎯")
 
 st.title("🎯 Loto Master : Euromillions")
 st.write("Analyse hybride des probabilités pour le prochain tirage.")
