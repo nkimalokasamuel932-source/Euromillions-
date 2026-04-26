@@ -2,61 +2,82 @@ import streamlit as st
 import pandas as pd
 import random
 
-# Configuration
-st.set_page_config(page_title="Loto-Euro Fusion Pro", page_icon="🧬")
+# Configuration de l'interface
+st.set_page_config(page_title="Loto-Euro Fusion Pro", page_icon="🧬", layout="wide")
 
-st.title("🧬 Intelligence Croisée : Loto & Euro")
-st.write("Analyse des tendances du **26 Avril 2026**")
+st.title("🧬 Intelligence Croisée : Loto & Euromillions")
+st.write("Analyse stratégique basée sur le tirage du **Samedi 25 Avril 2026**")
 
-# --- DONNÉES ---
-loto_chauds = [16, 22, 23, 2, 33, 30, 9, 10, 14, 29, 49, 13, 17]
-euro_chauds = [44, 42, 23, 19, 29, 37, 50, 25, 13, 17, 10, 49]
+# --- 1. BASE DE DONNÉES (LOGIQUE CROISÉE) ---
+# Tirage Loto du 25/04 : 17 - 22 - 23 - 25 - 49
+numeros_loto_chauds = [17, 22, 23, 25, 49, 16, 30, 2, 33, 9, 10, 13]
+numeros_euro_chauds = [44, 42, 23, 13, 17, 10, 49, 19, 29, 37, 50, 25]
 
-# Calcul de convergence automatique
-communs = list(set(loto_chauds) & set(euro_chauds))
+# Calcul automatique de la convergence
+convergence = list(set(numeros_loto_chauds) & set(numeros_euro_chauds))
 
-# Création sécurisée du tableau
-data_fusion = []
-for n in communs:
-    data_fusion.append({
-        "Numero": n,
-        "Force": random.randint(85, 99),
-        "Etat": "🔥 Brûlant" if n in [13, 23, 49] else "✅ Stable"
-    })
+# --- 2. LOGIQUE DE L'ENTONNOIR (TON ANALYSE) ---
+def generer_ticket_expert():
+    # A. Le Noyau Dur (Incontournables)
+    noyau = [13, 44] 
+    # B. Le Transfert d'Énergie (Loto vers Euro)
+    transfert = [23, 49, 17]
+    # C. Les Surprises (Écart ou Forme)
+    surprises = [42, 10, 16, 22]
+    
+    ticket = set()
+    ticket.add(13) # On force le pilier
+    ticket.add(23) # On force le pivot
+    
+    # On complète avec les autres listes
+    candidats = [n for n in (transfert + surprises + noyau) if n not in ticket]
+    while len(ticket) < 5:
+        ticket.add(random.choice(candidats))
+        
+    return sorted(list(ticket))
 
-df_convergence = pd.DataFrame(data_fusion)
-if not df_convergence.empty:
-    df_convergence = df_convergence.sort_values(by="Force", ascending=False)
-
-# --- INTERFACE ---
-tab1, tab2, tab3 = st.tabs(["🚀 CONVERGENCE", "🎯 LOTO MIROIR", "🇪🇺 EURO MIROIR"])
+# --- 3. INTERFACE UTILISATEUR ---
+tab1, tab2, tab3 = st.tabs(["🎯 PRONOSTIC EXPERT", "🚀 CONVERGENCE", "🔄 ANALYSE MIROIR"])
 
 with tab1:
-    st.subheader("📊 Les Élus de la Convergence")
-    if not df_convergence.empty:
-        st.table(df_convergence)
-        if st.button("Générer Ticket Fusion"):
-            piliers = df_convergence['Numero'].tolist()
-            base = random.sample(piliers, min(len(piliers), 3))
-            reste = random.sample([n for n in range(1, 51) if n not in base], 5 - len(base))
-            ticket = sorted(base + reste)
-            st.success(f"Ticket : {ticket}")
+    st.header("🏆 La Sélection de l'Entonnoir")
+    st.info("Cette méthode filtre les 50 numéros pour ne garder que l'élite : Pivot + Piliers + Écart.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔥 GÉNÉRER MON TICKET PRIORITAIRE"):
+            grille = generer_ticket_expert()
+            etoiles = sorted(random.sample([2, 8, 3, 10, 11], 2))
+            st.success(f"**Numéros :** {', '.join(map(str, grille))}")
+            st.warning(f"**Étoiles :** {etoiles[0]} — {etoiles[1]}")
             st.balloons()
-    else:
-        st.write("Calcul de convergence en cours...")
+            
+    with col2:
+        st.write("**Rappel de la Stratégie :**")
+        st.write("- **Pivot :** 23 (Confirmé Samedi)")
+        st.write("- **Piliers :** 13, 44")
+        st.write("- **Énergie Loto :** 17, 49")
 
 with tab2:
-    st.subheader("🎯 Jouer au Loto")
-    if st.button("Générer Loto (Influence Euro)"):
-        piliers = [n for n in euro_chauds if n <= 49]
-        t = sorted(random.sample(piliers, 3) + random.sample(range(1, 50), 2))
-        st.success(f"Ticket : {t} | Chance : {random.randint(1,10)}")
+    st.header("📊 Tableau de Convergence")
+    df_conv = pd.DataFrame({
+        "Numéro": convergence,
+        "Force": [99 if n in [13, 23] else 85 for n in convergence],
+        "Statut": ["⭐ Pivot/Pilier" if n in [13, 23] else "✅ Confirmé" for n in convergence]
+    }).sort_values(by="Force", ascending=False)
+    st.table(df_conv)
 
 with tab3:
-    st.subheader("🇪🇺 Jouer à l'Euro")
-    if st.button("Générer Euro (Influence Loto)"):
-        t = sorted(random.sample(loto_chauds, 3) + random.sample(range(1, 51), 2))
-        st.warning(f"Ticket : {t[:5]} | Étoiles : {sorted(random.sample(range(1,13), 2))}")
+    st.header("🔄 Flux Miroir")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader("Loto ➔ Euro")
+        st.write("Numéros du samedi à surveiller mardi :")
+        st.code("17, 22, 23, 25, 49")
+    with col_b:
+        st.subheader("Euro ➔ Loto")
+        st.write("Bases historiques pour le prochain Loto :")
+        st.code("44, 42, 13, 19")
 
 st.divider()
-st.metric(label="Numéro Pivot Global", value="23")
+st.caption("Dernière mise à jour : Dimanche 26 Avril 2026. Basé sur le succès du système (4/5 au Loto du 25/04).")
