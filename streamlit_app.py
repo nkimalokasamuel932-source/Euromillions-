@@ -7,7 +7,7 @@ st.set_page_config(page_title="Loto-Euro Fusion Pro", page_icon="🧬", layout="
 
 st.title("🧬 Intelligence Croisée : Loto & Euromillions")
 st.write("Analyse stratégique basée sur le tirage du **Samedi 25 Avril 2026**")
-
+st.title("🧬 Intelligence Croisée V2.0")
 # --- 1. BASE DE DONNÉES (LOGIQUE CROISÉE) ---
 # Tirage Loto du 25/04 : 17 - 22 - 23 - 25 - 49
 numeros_loto_chauds = [17, 22, 23, 25, 49, 16, 30, 2, 33, 9, 10, 13]
