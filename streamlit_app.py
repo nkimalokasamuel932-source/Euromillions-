@@ -1,108 +1,152 @@
 import streamlit as st
 import pandas as pd
-import os
+import random
+from datetime import datetime
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="IA EXPERT V2 - PRÉDICTIONS", layout="wide", page_icon="🎯")
+# --- 1. CONFIGURATION & DESIGN ---
+st.set_page_config(page_title="IA OMNIBUS V4.1 ELITE", page_icon="🧬", layout="wide")
 
-# Tirages réels pour les calculs de voisinage (Voisins du dernier tirage)
-DERNIERS_LOTO = [4, 12, 25, 33, 48]
-DERNIERS_EURO = [25, 26, 30, 40, 45]
-
-# --- FONCTION DE CALCUL AVANCÉ ---
-def calculer_scores_expert(df, derniers_numeros, limite):
-    df = df.copy()
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;700&display=swap');
+    .main { background-color: #050a14; font-family: 'Urbanist', sans-serif; color: #ffffff; }
     
-    # 1. Calcul de la TENSION (Proximité de l'écart max)
-    # Plus le score approche 100, plus le numéro est statistiquement "dû"
-    df['tension'] = (df['ecart_actuel'] / df['ecart_max'] * 100).fillna(0)
+    /* Cartes Glassmorphism */
+    .game-card {
+        padding: 30px; border-radius: 24px; background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 20px; text-align: center;
+    }
+    .euro-border { border-top: 5px solid #00ffcc; box-shadow: 0 10px 30px rgba(0, 255, 204, 0.1); }
+    .loto-border { border-top: 5px solid #ff00ff; box-shadow: 0 10px 30px rgba(255, 0, 255, 0.1); }
+
+    /* Boules 3D Premium */
+    .ball {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 60px; height: 60px; border-radius: 50%; font-size: 24px;
+        font-weight: 700; margin: 8px; color: #000;
+        box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 5px 5px 15px rgba(0,0,0,0.3);
+    }
+    .euro-ball { background: linear-gradient(145deg, #00ffcc, #0088aa); }
+    .loto-ball { background: linear-gradient(145deg, #ff00ff, #aa00aa); color: white; }
+    .star-ball { background: linear-gradient(145deg, #ffd700, #b8860b); width: 50px; height: 50px; font-size: 20px; }
+
+    .tag { display: block; font-size: 10px; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-top: -5px; }
     
-    # 2. Calcul de l'ACCÉLÉRATION (Forme récente vs historique)
-    # Un score > 100 signifie que le numéro sort plus souvent que sa moyenne
-    moyenne_historique = df['reussite'].mean()
-    df['acceleration'] = (df['forme_generale'] / (moyenne_historique / 10) * 100).fillna(0)
+    .stButton > button {
+        background: linear-gradient(90deg, #1e293b, #334155); color: white;
+        border-radius: 12px; height: 3.5em; width: 100%; border: 1px solid rgba(255,255,255,0.1);
+        transition: all 0.3s;
+    }
+    .stButton > button:hover { border-color: #00ffcc; color: #00ffcc; transform: translateY(-2px); }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. DICTIONNAIRE DES INDICATEURS STATISTIQUES (Base de données) ---
+# Format : [Masse_Hist, Tension_Ecart, Date_Derniere_Sortie, Zone, Label_Type, Est_Sorti_Loto_30_04]
+# Zone : 1 (Bas), 2 (Milieu), 3 (Haut)
+db = {
+    1:  [185, 4, 14, 1, "Masse Fondamentale", False],
+    2:  [179, 4, 30, 1, "Vase Épuisé", True],         # SORTI AU LOTO 30/04
+    3:  [187, 60, 30, 1, "Tension Relâchée", True],   # SORTI AU LOTO 30/04
+    4:  [197, 10, 14, 1, "Forme Constante", False],
+    6:  [188, 16, 27, 1, "Voisinage Alerte", False],
+    12: [194, 10, 24, 1, "Compagnon Direct", False], # COMPAGNON DU 2 (ASSPIRÉ)
+    13: [202, 2, 21, 1, "Élite Prioritaire", False], # COMPAGNON DU 3 (ASSPIRÉ)
+    23: [218, 3, 27, 2, "Pivot Central", False],
+    30: [180, 5, 30, 2, "Saturation Médiane", True],  # SORTI AU LOTO 30/04
+    31: [175, 8, 30, 2, "Saturation Médiane", True],  # SORTI AU LOTO 30/04
+    32: [178, 35, 0, 2, "Oublié Critique", False],    # TENSION MAX ACTUELLE
+    37: [190, 2, 30, 3, "Saturation Haute", True],    # SORTI AU LOTO 30/04
+    42: [219, 17, 0, 3, "Aspiration Sommet", False],
+    43: [179, 9, 27, 3, "Pivot Historique", False]
+}
+
+# --- 3. MOTEUR DE CALCUL MULTI-LOGIQUE ---
+def calculer_score_ia(n):
+    d = db.get(n)
+    # A. Fondamental (Masse 30% + Tension 40%)
+    score = (d[0] / 300 * 30) + (d[1] / 60 * 40)
     
-    # 3. Bonus VOISINAGE
-    voisins = [n-1 for n in derniers_numeros] + [n+1 for n in derniers_numeros]
-    df['bonus_voisin'] = df['numero'].apply(lambda x: 20 if x in voisins else 0)
-
-    # 4. SCORE FINAL EXPERT (Pondération)
-    # 40% Tension + 30% Accélération + 20% Sniper (Ecart Fav) + 10% Voisins
-    df['score_expert'] = (df['tension'] * 0.4) + (df['acceleration'] * 0.3) + (df['ecart_fav'] * 2) + df['bonus_voisin']
+    # B. Logique du Vase Communiquant
+    if d[5]: # Si sorti ce soir au Loto
+        score -= 55 # Malus critique (Énergie vide)
+    else:
+        # C. Logique du Compagnon (Voisinage)
+        # On vérifie si un numéro à +/- 1 ou +/- 10 est sorti ce soir
+        for v in [n-1, n+1, n-10, n+10]:
+            if v in db and db[v][5]: # Si le voisin est sorti au Loto
+                score += 35 # Bonus d'aspiration
+                break
     
-    return df.sort_values('score_expert', ascending=False)
+    # D. Respiration (Bonus Zone Basse pour Vendredi)
+    if d[3] == 1: score += 15
+    if d[2] <= 14: score += 20 # Bonus "Oubli"
+    
+    return round(score, 2)
 
-# --- CHARGEMENT DES DONNÉES ---
-@st.cache_data
-def load_data():
-    if os.path.exists('data_expert.csv'):
-        df = pd.read_csv('data_expert.csv')
-        df['jeu'] = df['jeu'].astype(str).str.upper().str.strip()
-        return df
-    return None
+# --- 4. INTERFACE ---
+st.title("🧬 IA OMNIBUS V4.1 : Terminal Expert")
+st.write(f"Analyse des flux du **{datetime.now().strftime('%d/%m/%Y')}** | Focus : **Vendredi 01 Mai**")
 
-df_raw = load_data()
+# Barre de diagnostic IA
+st.warning("⚠️ **ALERTE LOGIQUE :** Le 2 et le 3 ont migré vers le Loto. Pression maximale détectée sur le **12**, **13** et **32**.")
 
-# --- INTERFACE ---
-st.title("🛰️ IA EXPERT V2 : Analyse Multi-Jeux")
-st.markdown("Système de détection de **Tension** et d'**Accélération** fréquentielle.")
+tab1, tab2 = st.tabs(["🎯 TERMINAL DE PRÉDICTION", "📊 MATRICE DES INDICATEURS"])
 
-if df_raw is not None:
-    # Traitement des données
-    df_euro_final = calculer_scores_expert(df_raw[df_raw['jeu'] == 'EURO'], DERNIERS_EURO, 50)
-    df_loto_final = calculer_scores_expert(df_raw[df_raw['jeu'] == 'LOTO'], DERNIERS_LOTO, 49)
+with tab1:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<div class='game-card euro-border'>", unsafe_allow_html=True)
+        st.subheader("🇪🇺 EURO - PHASE D'EXPIRATION")
+        if st.button("CALCULER GRILLE EURO"):
+            scores_e = {n: calculer_score_ia(n) for n in db.keys()}
+            top_e = sorted(scores_e, key=scores_e.get, reverse=True)[:5]
+            
+            # Affichage des boules
+            html_euro = ""
+            for n in sorted(top_e):
+                tag = db[n][4]
+                html_euro += f"<div style='display:inline-block;text-align:center;'><div class='ball euro-ball'>{n}</div><span class='tag'>{tag}</span></div>"
+            st.markdown(html_euro, unsafe_allow_html=True)
+            
+            st.write("---")
+            # Étoiles (Résonance du 8 Loto)
+            st.markdown("<div class='ball star-ball'>3</div><div class='ball star-ball'>8</div><p><span class='tag'>Étoiles de Résonance</span></p>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- BARRE DE RÉSUMÉ (METRICS) ---
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("🎯 Top Tension EURO", int(df_euro_final.iloc[0]['numero']), f"Score: {df_euro_final.iloc[0]['score_expert']:.1f}")
-    m2.metric("🎰 Top Tension LOTO", int(df_loto_final.iloc[0]['numero']), f"Score: {df_loto_final.iloc[0]['score_expert']:.1f}")
-    m3.metric("🔥 Accélération Max", int(df_euro_final.sort_values('acceleration', ascending=False).iloc[0]['numero']), "Signal Forme")
-    m4.metric("📊 Données", "Synchronisées", "GitHub OK")
+    with col2:
+        st.markdown("<div class='game-card loto-border'>", unsafe_allow_html=True)
+        st.subheader("🇫🇷 LOTO - PHASE BALANCIER")
+        if st.button("CALCULER GRILLE LOTO"):
+            # Pour le loto on privilégie la forme récente
+            scores_l = {n: (db[n][0]/300*40) + (30 if db[n][5] else 0) for n in db.keys()}
+            top_l = sorted(scores_l, key=scores_l.get, reverse=True)[:5]
+            
+            html_loto = ""
+            for n in sorted(top_l):
+                html_loto += f"<div style='display:inline-block;text-align:center;'><div class='ball loto-ball'>{n}</div><span class='tag'>Forme</span></div>"
+            st.markdown(html_loto, unsafe_allow_html=True)
+            
+            st.write("---")
+            st.markdown("<div class='ball star-ball' style='background:#ff4b4b;color:white;'>4</div><p><span class='tag'>Chance Prioritaire</span></p>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.divider()
+with tab2:
+    st.write("### 🧮 Détail des Indicateurs de Force")
+    data_table = []
+    for k, v in db.items():
+        score = calculer_score_ia(k)
+        data_table.append({
+            "Num": k,
+            "Score Global": score,
+            "Tension (Ecart)": v[1],
+            "Migration": "⚠️ Épuisé" if v[5] else "🔥 Aspiré",
+            "Zone": f"Zone {v[3]}"
+        })
+    df = pd.DataFrame(data_table).sort_values("Score Global", ascending=False)
+    st.dataframe(df, use_container_width=True)
 
-    # --- AFFICHAGE PAR ONGLETS ---
-    tab1, tab2, tab3 = st.tabs(["🇪🇺 EURO : Analyse Profonde", "🎰 LOTO : Analyse Profonde", "🧠 Comprendre les scores"])
-
-    with tab1:
-        st.subheader("Classement Expert Euromillions")
-        st.dataframe(
-            df_euro_final[['numero', 'score_expert', 'tension', 'acceleration', 'ecart_actuel', 'affinite']],
-            use_container_width=True,
-            column_config={
-                "score_expert": st.column_config.ProgressColumn("Score Global", min_value=0, max_value=150, format="%.1f"),
-                "tension": "Tension %",
-                "acceleration": "Vitesse"
-            }
-        )
-
-    with tab2:
-        st.subheader("Classement Expert Loto France")
-        st.dataframe(
-            df_loto_final[['numero', 'score_expert', 'tension', 'acceleration', 'ecart_actuel', 'affinite']],
-            use_container_width=True,
-            column_config={
-                "score_expert": st.column_config.ProgressColumn("Score Global", min_value=0, max_value=150, format="%.1f"),
-                "tension": "Tension %",
-                "acceleration": "Vitesse"
-            }
-        )
-
-    with tab3:
-        st.markdown("""
-        ### Comment utiliser cette V2 ?
-        * **La Tension % :** Si un numéro dépasse **80%**, il entre en zone critique de sortie (Ecart proche du record).
-        * **L'Accélération :** Si le score est haut, le numéro est dans une 'série'. Il faut souvent en inclure un ou deux.
-        * **Le Score Global :** C'est la synthèse. Un numéro avec un score élevé combine retard et probabilité de réveil.
-        """)
-
-    # --- SIDEBAR RECHERCHE ---
-    with st.sidebar:
-        st.header("🔍 Analyse par Numéro")
-        num = st.number_input("Choisir un numéro", 1, 50)
-        if num:
-            stats = df_raw[df_raw['numero'] == num]
-            st.write(stats)
-
-else:
-    st.error("Le fichier data_expert.csv est manquant sur votre GitHub.")
+st.divider()
+st.caption("Version 4.1 - Logique de transfert d'énergie post-tirage Loto du 30/04.")
